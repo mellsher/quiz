@@ -7,7 +7,7 @@ const multer = require('multer');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
-
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -24,8 +24,8 @@ app.use(session({
 }));
 
 const storage = multer.diskStorage({
-    destination: (cb) => cb(null, 'public/uploads/'),
-    filename: (file, cb) => cb(null, Date.now() + path.extname(file.originalname))
+    destination: (req, file, cb) => cb(null, 'public/uploads/'),
+    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
 });
 const upload = multer({ storage: storage });
 
@@ -49,7 +49,7 @@ app.post('/api/register', async (req, res) => {
 
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
-    db.get("SELECT * FROM users WHERE username = ?", [username], async (user) => {
+    db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
         if (!user) return res.status(400).json({ error: 'Неверный логин' });
         const match = await bcrypt.compare(password, user.password_hash);
         if (match) {
@@ -70,15 +70,15 @@ app.get('/api/me', (req, res) => {
 });
 
 
-// 1. редактирование
+// 1. для редактирования
 app.get('/api/quizzes/:id', (req, res) => {
     if (!req.session.userId) return res.status(401).send();
     const quizId = req.params.id;
 
-    db.get("SELECT * FROM quizzes WHERE id = ? AND owner_id = ?", [quizId, req.session.userId], (quiz) => {
+    db.get("SELECT * FROM quizzes WHERE id = ? AND owner_id = ?", [quizId, req.session.userId], (err, quiz) => {
         if (!quiz) return res.status(404).json({error: "Not found"});
 
-        db.all("SELECT * FROM questions WHERE quiz_id = ?", [quizId], (questions) => {
+        db.all("SELECT * FROM questions WHERE quiz_id = ?", [quizId], (err, questions) => {
             res.json({ ...quiz, questions });
         });
     });
@@ -96,7 +96,7 @@ app.post('/api/save-quiz', upload.any(), (req, res) => {
         db.run("DELETE FROM questions WHERE quiz_id = ?", [quizId], () => {
             const stmt = db.prepare("INSERT INTO questions (quiz_id, text, options, correct_indices, image_url, time_limit) VALUES (?, ?, ?, ?, ?, ?)");
 
-            questions.forEach((q) => {
+            questions.forEach((q, index) => {
                 let imgUrl = q.image_url || null;
 
                 const file = req.files.find(f => f.fieldname === `image_${q.tempId}`);
@@ -112,7 +112,7 @@ app.post('/api/save-quiz', upload.any(), (req, res) => {
     if (id && id !== 'null') {
         db.run("UPDATE quizzes SET title=?, description=? WHERE id=? AND owner_id=?",
             [title, description, id, req.session.userId],
-            function() {
+            function(err) {
                 if (this.changes === 0) return res.status(403).json({error: "Нет прав"});
                 saveQuestions(id);
             }
@@ -120,7 +120,7 @@ app.post('/api/save-quiz', upload.any(), (req, res) => {
     } else {
         db.run("INSERT INTO quizzes (owner_id, title, description) VALUES (?, ?, ?)",
             [req.session.userId, title, description],
-            function() {
+            function(err) {
                 saveQuestions(this.lastID);
             }
         );
@@ -132,7 +132,7 @@ app.delete('/api/quizzes/:id', (req, res) => {
     if (!req.session.userId) return res.status(401).send();
     const quizId = req.params.id;
 
-    db.run("DELETE FROM quizzes WHERE id = ? AND owner_id = ?", [quizId, req.session.userId], function() {
+    db.run("DELETE FROM quizzes WHERE id = ? AND owner_id = ?", [quizId, req.session.userId], function(err) {
         if (this.changes > 0) {
             db.run("DELETE FROM questions WHERE quiz_id = ?", [quizId]);
             res.json({ status: 'ok' });
@@ -145,13 +145,13 @@ app.delete('/api/quizzes/:id', (req, res) => {
 // список квизов
 app.get('/api/my-quizzes', (req, res) => {
     if (!req.session.userId) return res.status(401).json({});
-    db.all("SELECT * FROM quizzes WHERE owner_id = ?", [req.session.userId], (rows) => res.json(rows));
+    db.all("SELECT * FROM quizzes WHERE owner_id = ?", [req.session.userId], (err, rows) => res.json(rows));
 });
 
 // история
 app.get('/api/my-history', (req, res) => {
     if (!req.session.userId) return res.status(401).json({});
-    db.all("SELECT * FROM history WHERE user_id = ? ORDER BY id DESC", [req.session.userId], (rows) => res.json(rows));
+    db.all("SELECT * FROM history WHERE user_id = ? ORDER BY id DESC", [req.session.userId], (err, rows) => res.json(rows));
 });
 
 // очистить историю
@@ -222,7 +222,7 @@ function finishGame(pin) {
 
     const date = new Date().toLocaleString("ru-RU");
     const stmt = db.prepare("INSERT INTO history (user_id, quiz_title, role, score, date) VALUES (?, ?, ?, ?, ?)");
-    db.get("SELECT title FROM quizzes WHERE id = ?", [game.quizId], (row) => {
+    db.get("SELECT title FROM quizzes WHERE id = ?", [game.quizId], (err, row) => {
         const title = row ? row.title : 'Квиз';
         game.players.forEach(p => {
             if (p.dbUserId) stmt.run(p.dbUserId, title, 'player', p.score, date);
@@ -257,7 +257,7 @@ io.on('connection', (socket) => {
     socket.on('host_start_game', (pin) => {
         const game = games[pin];
         if (!game) return;
-        db.all("SELECT * FROM questions WHERE quiz_id = ?", [game.quizId], (rows) => {
+        db.all("SELECT * FROM questions WHERE quiz_id = ?", [game.quizId], (err, rows) => {
             if (!rows || rows.length === 0) return;
             game.questions = rows;
             game.currentIndex = 0;
