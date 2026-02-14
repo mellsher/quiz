@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Играть</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .box { background: white; padding: 20px; border-radius: 15px; max-width: 400px; margin: 50px auto; }
+        input { width: 100%; padding: 15px; margin: 10px 0; font-size: 18px; box-sizing: border-box; }
+        .btn-join { width: 100%; padding: 15px; background: #46178f; color: white; border: none; font-size: 18px; font-weight: bold; cursor: pointer; }
+
+        #waiting-screen, #game-screen, #result-screen { display: none; }
+
+        .answers-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
+        .answer-btn { padding: 20px; border: 4px solid transparent; border-radius: 10px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+
+        .color-0 { background-color: #e21b3c; } .color-1 { background-color: #1368ce; }
+        .color-2 { background-color: #d89e00; } .color-3 { background-color: #26890c; }
+
+        .answer-btn.selected { border-color: white; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: scale(1.02); }
+
+        #submit-btn {
+            width: 100%; padding: 15px; background: #333; color: white;
+            font-size: 20px; border: none; border-radius: 10px; cursor: pointer;
+            display: none;
+        }
+
+        .disabled-btn { opacity: 0.5; pointer-events: none; }
+        #timer-display { font-size: 60px; font-weight: bold; color: #46178f; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen" class="box">
+        <h1>Вход</h1>
+        <input type="number" id="pin-input" placeholder="PIN код">
+        <input type="text" id="name-input" placeholder="Имя">
+        <button class="btn-join" onclick="joinGame()">ИГРАТЬ</button>
+    </div>
+
+    <div id="waiting-screen" style="margin-top: 50px;">
+        <h1>Ждем ведущего...</h1>
+    </div>
+
+    <div id="game-screen">
+        <div id="timer-display"></div>
+        <div id="q-text" style="font-size:20px; margin-bottom:20px; font-weight:bold;"></div>
+
+        <div id="buttons-container" class="answers-grid"></div>
+
+        <button id="submit-btn" onclick="submitAnswer()">ОТПРАВИТЬ ОТВЕТ</button>
+    </div>
+
+    <div id="result-screen" class="box">
+        <h1>Игра окончена!</h1>
+        <h2 id="final-score"></h2>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let timerInterval;
+        let selectedIndices = [];
+        let myDbId = null;
+
+        fetch('/api/me').then(res => {
+            if (res.ok) return res.json();
+            return null;
+        }).then(user => {
+            if (user) {
+                document.getElementById('name-input').value = user.username;
+                document.getElementById('name-input').disabled = true;
+                document.getElementById('name-input').style.backgroundColor = "#e9ecef";
+                myDbId = user.id;
+            }
+        });
+
+        function joinGame() {
+            const pin = document.getElementById('pin-input').value;
+            const name = document.getElementById('name-input').value;
+            if (!pin || !name) return alert("Заполни поля!");
+
+            socket.emit('player_join', { pin, nickname: name, dbUserId: myDbId });
+        }
+
+
+        socket.on('player_joined_success', () => {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('waiting-screen').style.display = 'block';
+        });
+
+        socket.on('player_question_start', (data) => {
+            document.getElementById('waiting-screen').style.display = 'none';
+            document.getElementById('result-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+
+            document.getElementById('q-text').innerText = data.text;
+            const container = document.getElementById('buttons-container');
+            container.innerHTML = '';
+
+            selectedIndices = [];
+            document.getElementById('submit-btn').style.display = 'none';
+
+            let timeLeft = data.timeLimit;
+            const timerDisplay = document.getElementById('timer-display');
+            timerDisplay.innerText = timeLeft;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.innerText = timeLeft;
+                if (timeLeft <= 0) clearInterval(timerInterval);
+            }, 1000);
+
+            data.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = `answer-btn color-${index}`;
+                btn.innerText = opt;
+                btn.onclick = () => {
+                    if (selectedIndices.includes(index)) {
+                        selectedIndices = selectedIndices.filter(i => i !== index);
+                        btn.classList.remove('selected');
+                    } else {
+                        selectedIndices.push(index);
+                        btn.classList.add('selected');
+                    }
+                    const submitBtn = document.getElementById('submit-btn');
+                    submitBtn.style.display = selectedIndices.length > 0 ? 'block' : 'none';
+                };
+                container.appendChild(btn);
+            });
+        });
+
+        function submitAnswer() {
+            const btns = document.querySelectorAll('.answer-btn');
+            btns.forEach(b => b.classList.add('disabled-btn'));
+            document.getElementById('submit-btn').style.display = 'none';
+            document.getElementById('q-text').innerText = "Ответ отправлен...";
+
+            socket.emit('player_answer', {
+                pin: document.getElementById('pin-input').value,
+                answerIndices: selectedIndices
+            });
+        }
+
+        socket.on('time_up', () => {
+            clearInterval(timerInterval);
+            document.getElementById('timer-display').innerText = "0";
+            document.querySelectorAll('.answer-btn').forEach(b => b.classList.add('disabled-btn'));
+            document.getElementById('submit-btn').style.display = 'none';
+            document.getElementById('q-text').innerText = "Время вышло!";
+        });
+
+        socket.on('game_over', (leaderboard) => {
+            clearInterval(timerInterval);
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('waiting-screen').style.display = 'none';
+            document.getElementById('result-screen').style.display = 'block';
+
+            const myName = document.getElementById('name-input').value;
+            const me = leaderboard.find(p => p.name === myName);
+            if (me) {
+                document.getElementById('final-score').innerText = `Очки: ${me.score}`;
+            }
+
+            const backBtn = document.createElement('button');
+            backBtn.innerText = "Вернуться в кабинет";
+            backBtn.className = "btn-join";
+            backBtn.style.marginTop = "20px";
+            backBtn.onclick = () => window.location.href = '/dashboard.html';
+            document.getElementById('result-screen').appendChild(backBtn);
+        });
+    </script>
+</body>
+</html>

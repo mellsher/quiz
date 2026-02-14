@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Конструктор Квиза</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; margin: 0; background: #f4f4f9; }
+
+        .sidebar { width: 280px; background: white; border-right: 1px solid #ddd; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.05); }
+        .sidebar h3 { margin-top: 0; color: #46178f; }
+
+        .main { flex: 1; padding: 40px; overflow-y: auto; }
+        .editor-container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+
+        input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 12px; margin: 5px 0 15px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        input[type="text"]:focus { border-color: #46178f; outline: none; }
+
+        label { font-weight: 600; font-size: 14px; color: #555; display: block; margin-bottom: 5px; }
+
+        .btn { padding: 12px; border: none; border-radius: 8px; cursor: pointer; color: white; width: 100%; margin-top: 10px; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .btn-primary { background: #46178f; }
+        .btn-success { background: #28a745; margin-top: auto; }
+        .btn-danger-small { background: #ff4d4f; width: auto; padding: 4px 8px; font-size: 16px; margin: 0; border-radius: 4px; line-height: 1; }
+        .btn-add { background: #f0f0f5; color: #46178f; border: 2px dashed #d1d1e0; margin-bottom: 20px; }
+        .btn-add:hover { background: #e6e6f2; border-color: #46178f; }
+        .img-btn { background: #f9f9f9; border: none; color: #666; padding: 8px 15px; border-radius: 5px; border: 1px solid #eee; cursor: pointer; transition: 0.2s; }
+        .img-btn:hover { background: #eee; }
+
+        .q-item { background: #f8f9fa; padding: 12px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; border-left: 4px solid transparent; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .q-item:hover { background: #f0f0f5; }
+        .q-item.active { border-left-color: #46178f; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-weight: bold; }
+
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .opt-row { display: flex; align-items: center; gap: 10px; background: #fafafa; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
+        .opt-row input[type="checkbox"] { width: 20px; height: 20px; margin: 0; cursor: pointer; accent-color: #28a745; }
+        .opt-row input[type="text"] { margin: 0; border: none; background: transparent; }
+        .opt-row input[type="text"]:focus { border-bottom: 1px solid #ddd; border-radius: 0; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h3>Вопросы</h3>
+        <div id="questions-list"></div>
+        <button class="btn btn-add" onclick="addNewQuestion()">+ Добавить вопрос</button>
+        <button class="btn btn-success" onclick="saveQuiz()">СОХРАНИТЬ КВИЗ</button>
+        <a href="/dashboard.html" style="text-align:center; display:block; margin-top:15px; color:#888; text-decoration:none; font-size:13px;">Вернуться назад</a>
+    </div>
+
+    <div class="main">
+        <div class="editor-container">
+            <h2 style="margin-top:0;">Настройки квиза</h2>
+            <input type="text" id="quiz-title" placeholder="Название квиза" style="font-size: 18px; font-weight: bold;">
+            <input type="text" id="quiz-desc" placeholder="Краткое описание">
+
+            <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;">
+
+            <div id="question-editor" style="display:none;">
+                <h3 id="editor-title" style="color:#46178f;">Редактирование вопроса</h3>
+
+                <label>Текст вопроса</label>
+                <input type="text" id="q-text" oninput="updateCurrentQ()" placeholder="Что такое 42?">
+
+                <label>Картинка (необязательно)</label>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                    <input type="file" id="q-image" onchange="updateCurrentQ()" style="display: none;">
+                    <button type="button" class="img-btn" onclick="document.getElementById('q-image').click()">Выбрать файл</button>
+                    <span id="current-image-preview" style="font-size:13px; color:#666; background:#f9f9f9; padding:5px 10px; border-radius:5px;">
+                        Нет картинки
+                    </span>
+                </div>
+
+                <label>Варианты ответов (поставь галочки напротив правильных)</label>
+                <div class="options-grid">
+                    <div class="opt-row">
+                        <input type="checkbox" class="correct-cb" data-idx="0" onchange="updateCurrentQ()">
+                        <input type="text" id="opt-0" placeholder="Вариант 1" oninput="updateCurrentQ()">
+                    </div>
+                    <div class="opt-row">
+                        <input type="checkbox" class="correct-cb" data-idx="1" onchange="updateCurrentQ()">
+                        <input type="text" id="opt-1" placeholder="Вариант 2" oninput="updateCurrentQ()">
+                    </div>
+                    <div class="opt-row">
+                        <input type="checkbox" class="correct-cb" data-idx="2" onchange="updateCurrentQ()">
+                        <input type="text" id="opt-2" placeholder="Вариант 3" oninput="updateCurrentQ()">
+                    </div>
+                    <div class="opt-row">
+                        <input type="checkbox" class="correct-cb" data-idx="3" onchange="updateCurrentQ()">
+                        <input type="text" id="opt-3" placeholder="Вариант 4" oninput="updateCurrentQ()">
+                    </div>
+                </div>
+
+                <label style="margin-top:20px;">Время на ответ (секунды)</label>
+                <input type="number" id="q-time" value="20" oninput="updateCurrentQ()" style="width: 100px;">
+            </div>
+
+            <div id="empty-state" style="text-align:center; color:#999; padding: 40px;">
+                Выберите вопрос слева или создайте новый
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let quizId = null;
+        let questions = [];
+        let activeIndex = -1;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        quizId = urlParams.get('id');
+
+        fetch('/api/me').then(res => { if(!res.ok) window.location.href = '/login.html'; });
+
+        if (quizId) {
+            // 1. редактирование
+            fetch(`/api/quizzes/${quizId}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('quiz-title').value = data.title;
+                    document.getElementById('quiz-desc').value = data.description || '';
+
+                    questions = data.questions.map((q, i) => ({
+                        tempId: Date.now() + i,
+                        text: q.text,
+                        options: JSON.parse(q.options),
+                        correct: JSON.parse(q.correct_indices),
+                        time_limit: q.time_limit,
+                        image_url: q.image_url,
+                        file: null
+                    }));
+
+                    renderList();
+                    if(questions.length > 0) selectQuestion(0);
+                });
+        } else {
+            addNewQuestion();
+        }
+
+        // 2. добавление вопроса
+        function addNewQuestion() {
+            const newQ = {
+                tempId: Date.now(),
+                text: "Новый вопрос",
+                options: ["", "", "", ""],
+                correct: [0],
+                time_limit: 20,
+                image_url: null,
+                file: null
+            };
+            questions.push(newQ);
+            renderList();
+            selectQuestion(questions.length - 1);
+        }
+
+        function deleteQuestion(index, e) {
+            e.stopPropagation();
+            if(!confirm("Удалить этот вопрос?")) return;
+            questions.splice(index, 1);
+            if(questions.length > 0) {
+                selectQuestion(Math.max(0, index - 1));
+            } else {
+                document.getElementById('question-editor').style.display = 'none';
+                document.getElementById('empty-state').style.display = 'block';
+                activeIndex = -1;
+            }
+            renderList();
+        }
+
+        // 3. выбор вопроса для редактирования
+        function selectQuestion(index) {
+            activeIndex = index;
+            const q = questions[index];
+
+            document.getElementById('question-editor').style.display = 'block';
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('editor-title').innerText = `Вопрос #${index + 1}`;
+
+            document.getElementById('q-text').value = q.text;
+            document.getElementById('q-time').value = q.time_limit;
+
+            for(let i=0; i<4; i++) {
+                document.getElementById(`opt-${i}`).value = q.options[i];
+                const checkbox = document.querySelector(`.correct-cb[data-idx="${i}"]`);
+                checkbox.checked = q.correct.includes(i);
+            }
+
+            const preview = document.getElementById('current-image-preview');
+            if (q.file) {
+                preview.innerText = "📁 Файл выбран: " + q.file.name;
+            } else if (q.image_url) {
+                preview.innerText = "🖼 Текущая: " + q.image_url.split('/').pop();
+            } else {
+                preview.innerText = "Нет картинки";
+            }
+            document.getElementById('q-image').value = '';
+
+            renderList();
+        }
+
+        // 4. сохранение изменений
+        function updateCurrentQ() {
+            if (activeIndex === -1) return;
+            const q = questions[activeIndex];
+
+            q.text = document.getElementById('q-text').value;
+            q.time_limit = parseInt(document.getElementById('q-time').value) || 20;
+
+            for(let i=0; i<4; i++) {
+                q.options[i] = document.getElementById(`opt-${i}`).value;
+            }
+
+            q.correct = [];
+            document.querySelectorAll('.correct-cb').forEach(cb => {
+                if(cb.checked) {
+                    q.correct.push(parseInt(cb.getAttribute('data-idx')));
+                }
+            });
+
+            const fileInput = document.getElementById('q-image');
+            if (fileInput.files.length > 0) {
+                q.file = fileInput.files[0];
+                document.getElementById('current-image-preview').innerText = "Файл выбран: " + q.file.name;
+            }
+
+            const listItem = document.querySelectorAll('.q-item')[activeIndex];
+            if(listItem) {
+                listItem.querySelector('span').innerText = `${activeIndex+1}. ${q.text.substring(0, 19)}...`;
+            }
+        }
+
+        function renderList() {
+            const list = document.getElementById('questions-list');
+            list.innerHTML = questions.map((q, i) => `
+                <div class="q-item ${i === activeIndex ? 'active' : ''}" onclick="selectQuestion(${i})">
+                    <span>${i+1}. ${q.text.substring(0, 20)}...</span>
+                    <button class="btn btn-danger-small" onclick="deleteQuestion(${i}, event)">✕</button>
+                </div>
+            `).join('');
+        }
+
+        // 5. на сервак
+        async function saveQuiz() {
+            const title = document.getElementById('quiz-title').value;
+            if (!title) return alert("Введите название квиза!");
+            if (questions.length === 0) return alert("Добавьте хотя бы один вопрос!");
+
+            const invalidQ = questions.findIndex(q => q.correct.length === 0);
+            if (invalidQ !== -1) return alert(`В вопросе №${invalidQ+1} не выбран правильный ответ!`);
+
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('description', document.getElementById('quiz-desc').value);
+            formData.append('id', quizId);
+
+            const questionsJson = questions.map(q => ({
+                tempId: q.tempId,
+                text: q.text,
+                options: JSON.stringify(q.options),
+                correct_indices: JSON.stringify(q.correct),
+                time_limit: q.time_limit,
+                image_url: q.image_url
+            }));
+
+            formData.append('questionsData', JSON.stringify(questionsJson));
+
+            questions.forEach(q => {
+                if (q.file) formData.append(`image_${q.tempId}`, q.file);
+            });
+
+            try {
+                const res = await fetch('/api/save-quiz', { method: 'POST', body: formData });
+                if (res.ok) {
+                    alert("Квиз успешно сохранен!");
+                    window.location.href = '/dashboard.html';
+                } else {
+                    const err = await res.json();
+                    alert("Ошибка: " + err.error);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Ошибка сохранения");
+            }
+        }
+    </script>
+</body>
+</html>
