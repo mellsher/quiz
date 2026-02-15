@@ -7,13 +7,13 @@
     <style>
         body { font-family: sans-serif; text-align: center; background-color: #f0f2f5; margin: 0; padding: 20px; }
         .box { background: white; padding: 20px; border-radius: 15px; max-width: 400px; margin: 50px auto; }
-        input { width: 100%; padding: 15px; margin: 10px 0; font-size: 18px; box-sizing: border-box; }
-        .btn-join { width: 100%; padding: 15px; background: #46178f; color: white; border: none; font-size: 18px; font-weight: bold; cursor: pointer; }
+        input { width: 100%; padding: 15px; margin: 10px 0; font-size: 18px; border-radius: 5px; box-sizing: border-box; }
+        .btn-join { width: 100%; padding: 15px; background: #46178f; color: white; border: none; border-radius: 5px; font-size: 18px; font-weight: bold; cursor: pointer; }
 
         #waiting-screen, #game-screen, #result-screen { display: none; }
 
-        .answers-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
-        .answer-btn { padding: 20px; border: 4px solid transparent; border-radius: 10px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .answers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 800px; margin: 20px auto; width: 100%;}
+        .answer-btn { padding: 20px; border: none; border-radius: 10px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; min-height: 120px; display: flex; align-items: center; justify-content: center;}
 
         .color-0 { background-color: #e21b3c; } .color-1 { background-color: #1368ce; }
         .color-2 { background-color: #d89e00; } .color-3 { background-color: #26890c; }
@@ -21,9 +21,9 @@
         .answer-btn.selected { border-color: white; box-shadow: 0 0 10px rgba(0,0,0,0.5); transform: scale(1.02); }
 
         #submit-btn {
-            width: 100%; padding: 15px; background: #333; color: white;
+            width: 100%; max-width: 600px; padding: 15px; background: #333; color: white;
             font-size: 20px; border: none; border-radius: 10px; cursor: pointer;
-            display: none;
+            display: none; margin: 20px auto;
         }
 
         .disabled-btn { opacity: 0.5; pointer-events: none; }
