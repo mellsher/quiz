@@ -286,4 +286,8 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(3000, () => { console.log('Сервер SuperQuiz запущен на порту 3000'); });
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+    console.log(`SuperPuperUltraMegaQuizProMax is running on port ${PORT}`);
+});
